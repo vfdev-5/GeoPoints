@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">Geo Points</string>
+    <string name="title_activity_geo_point_list">GeoPoints</string>
+    <string name="action_settings">Settings</string>
+    <string name="action_add_point">Add</string>
+    <string name="action_remove_point">Remove</string>
+    <string name="action_show_on_map">Show on map</string>
+
+    <string name="title_activity_geo_point_edit">Edit Geo Point</string>
+
+    <string name="gpName">Name :</string>
+    <string name="gpDescription">Description :</string>
+    <string name="gpLocation">Location :</string>
+    <string name="gpTime">Date/Time :</string>
+    <string name="gpShowOnMap">Show\n on map</string>
+
+
+</resources>
