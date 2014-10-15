@@ -6,7 +6,7 @@ package com.vfdev.android.DB;
 public class GeoDBConf {
     /** Geo Database info : name, version, tables, field names etc */
     public static final String GEODB_NAME="GeoDB";
-    public static final int GEODB_VERSION=1;
+    public static final int GEODB_VERSION=2;
     public static final String GEODB_TABLE_GEOPOINTS="GeoPoints";
     public static final String GEODB_TABLE_GEOREMINDERS="GeoReminders";
 
@@ -32,7 +32,7 @@ public class GeoDBConf {
                     COMMON_KEY_DESC + " text not null, " +
                     COMMON_KEY_LAT + " float not null, " +
                     COMMON_KEY_LON + " float not null, " +
-                    GEOPOINTS_KEY_TIME + " timestamp not null" +
+                    GEOPOINTS_KEY_TIME + " text not null" +
                     ");";
 
     public static final String GEODB_CREATE_GEOREMINDERS=
@@ -46,10 +46,12 @@ public class GeoDBConf {
                     GEOREMINDERS_KEY_ACTION + " text not null" +
                     ");";
 
-    /** Command to drop off all tables */
-    public static final String GEODB_CLEAR=
+    /** Commands to drop off all tables */
+    public static final String GEODB_GEOPOINTS=
             "DROP TABLE IF EXISTS " +
-                    GEODB_TABLE_GEOPOINTS + ", " +
-                    GEODB_TABLE_GEOREMINDERS +
-                    ";";
+                    GEODB_TABLE_GEOPOINTS + ";";
+
+    public static final String GEODB_GEOREMINDERS=
+            "DROP TABLE IF EXISTS " +
+                    GEODB_TABLE_GEOREMINDERS + ";";
 }

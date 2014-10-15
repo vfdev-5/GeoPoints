@@ -9,24 +9,32 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.util.Log;
 import android.widget.Toast;
+
+import java.util.List;
 
 /**
  * Created by FV on 30.08.2014.
  */
 public class GeoTracker extends Service implements LocationListener {
 
-    private static final int LOCATION_MIN_TIME_UPDATE=5000; // in millis
-    private static final int LOCATION_MIN_DIST_UPDATE=10; // in meters
+    private static final String TAG = GeoTracker.class.getName();
+
+    private static final float MAX_ACCURACY = 50.0f; // meters
+    private static final int MAX_TIME_INTERVAL = 5*60*1000; // 5 minutes = interval between last measured location and current time
+
+    private long mLocationMinTimeUpdate = 10 * 1000;
+    private float mLocationMinDistUpdate = 10.0f;
 
     private LocationManager mLocationManager = null;
     private String mProvider = "";
+    private String mAvailableProviders = "";
     private Location mCurrentLocation = null;
 
     // flags :
     boolean isGPSEnabled = false;
     boolean isNetworkEnabled = false;
-    boolean canGetLocation = false;
     boolean isEnabled = false;
 
 
@@ -40,60 +48,106 @@ public class GeoTracker extends Service implements LocationListener {
         mListener = listener;
     }
 
-
     // Singleton instance
     private static GeoTracker mInstance = null;
 
-    public static GeoTracker getInstance(Context context) {
-        if (mInstance == null && context != null) {
-            mInstance = new GeoTracker(context);
+    public static GeoTracker getInstance() {
+        if (mInstance == null) {
+            mInstance = new GeoTracker();
         }
         return mInstance;
     }
-    public static GeoTracker getInstance() {
-        return mInstance;
-    }
 
-
-    private GeoTracker(Context context) {
+    public boolean init(Context context) {
 
         mLocationManager = (LocationManager) context.getSystemService(LOCATION_SERVICE);
         if (mLocationManager == null) {
-            return;
+            return false;
         }
-        canGetLocation=true;
-        isGPSEnabled = mLocationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
-        isNetworkEnabled = mLocationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+        checkProviders();
         if (isGPSEnabled || isNetworkEnabled){
             isEnabled = true;
-            requestLocationUpdates();
+//            requestLocationUpdates();
         }
+        return true;
+    }
+
+
+    private void checkProviders() {
+        isGPSEnabled = mLocationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+        isNetworkEnabled = mLocationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+        mAvailableProviders="";
+        if (isGPSEnabled)
+            mAvailableProviders += "gps ";
+        if (isNetworkEnabled)
+            mAvailableProviders += "network ";
+
+//        Toast.makeText(this, "Check providers, available providers : " + mAvailableProviders, Toast.LENGTH_LONG).show();
+        Log.i(TAG, "Check providers, available providers : " + mAvailableProviders);
 
     }
 
-    public boolean canGetLocation() {
-        return canGetLocation;
+    private GeoTracker() {
+        // empty
     }
+
     public boolean isEnabled() {
         return isEnabled;
     }
 
+    public long getLocationMinTimeUpdate() {
+        return mLocationMinTimeUpdate;
+    }
+    public void setLocationMinTimeUpdate(int time) {
+        mLocationMinTimeUpdate = time;
+    }
+
+    public float getLocationMinDistUpdate() {
+        return mLocationMinDistUpdate;
+    }
+    public void setLocationMinDistUpdate(int dist) {
+        mLocationMinDistUpdate = dist;
+    }
+
+
+    protected boolean isInitOK() {
+        if (mLocationManager == null) {
+            Log.w(TAG, "Class is not initialized or Location services are not available");
+            return false;
+        }
+        return true;
+    }
+
+
     public void requestLocationUpdates() {
-        // Firstly request
+
+        if (!isInitOK()) return;
+
+        checkProviders();
+        Log.i(TAG, "requestLocationUpdates");
         if (isNetworkEnabled) {
             mProvider = LocationManager.NETWORK_PROVIDER;
-        } else if (isGPSEnabled) {
-            mProvider = LocationManager.GPS_PROVIDER;
+            mLocationManager.requestLocationUpdates(
+                    mProvider,
+                    mLocationMinTimeUpdate,
+                    mLocationMinDistUpdate,
+                    this
+            );
         }
-        mLocationManager.requestLocationUpdates(
-                mProvider,
-                LOCATION_MIN_TIME_UPDATE,
-                LOCATION_MIN_DIST_UPDATE,
-                this
-        );
+
+        if (isGPSEnabled) {
+            mProvider = LocationManager.GPS_PROVIDER;
+            mLocationManager.requestLocationUpdates(
+                    mProvider,
+                    mLocationMinTimeUpdate,
+                    mLocationMinDistUpdate,
+                    this
+            );
+        }
     }
 
     public void stopLocationUpdates() {
+        if (!isInitOK()) return;
         mLocationManager.removeUpdates(this);
     }
 
@@ -111,8 +165,42 @@ public class GeoTracker extends Service implements LocationListener {
         return 0.0;
     }
 
+    public Location getLastKnownLocation() {
+        if (!isInitOK()) return null;
+
+        float accuracy = Float.MAX_VALUE;
+        long time = Long.MIN_VALUE;
+        Location output = null;
+
+        List<String> providers = mLocationManager.getAllProviders();
+        for (String provider: providers) {
+
+            Location loc = mLocationManager.getLastKnownLocation(provider);
+            if (loc != null) {
+
+                float a = loc.getAccuracy();
+                if (a < accuracy) {
+                    accuracy = a;
+                    time = loc.getTime();
+                    output = loc;
+                }
+            }
+
+        }
+
+        if (accuracy > MAX_ACCURACY ||
+                System.currentTimeMillis() - time > MAX_TIME_INTERVAL) {
+            output = null;
+        }
+        return output;
+    }
+
     public String getProvider() {
         return mProvider;
+    }
+
+    public String getAvailableProviders() {
+        return mAvailableProviders;
     }
 
     @Override
@@ -124,7 +212,6 @@ public class GeoTracker extends Service implements LocationListener {
     @Override
     public void onProviderDisabled(String provider) {
         Toast.makeText(this, "Disabled provider " + provider, Toast.LENGTH_SHORT).show();
-        mProvider = provider;
     }
 
     @Override

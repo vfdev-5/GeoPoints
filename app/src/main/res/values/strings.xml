@@ -8,6 +8,9 @@
     <string name="action_remove_point">Remove</string>
     <string name="action_show_on_map">Show on map</string>
 
+    <string name="your_location">Your location: </string>
+    <string name="no_current_location">----, ----</string>
+
     <string name="title_activity_geo_point_edit">Edit Geo Point</string>
 
     <string name="gpName">Name :</string>
@@ -16,5 +19,20 @@
     <string name="gpTime">Date/Time :</string>
     <string name="gpShowOnMap">Show\n on map</string>
 
+
+    <string name="map_select_type_dialog">Map Type</string>
+    <string name="map_type_normal">Normal</string>
+    <string name="map_type_hybrid">Hybrid</string>
+    <string name="map_type_satellite">Satellite</string>
+    <string name="map_type_terrain">Terrain</string>
+
+    <string-array name="maptypes">
+        <item>@string/map_type_normal</item>
+        <item>@string/map_type_hybrid</item>
+        <item>@string/map_type_satellite</item>
+        <item>@string/map_type_terrain</item>
+    </string-array>
+
+    <string name="google_maps_key">AIzaSyDcSZfAjUjc4kBL1bgHDyEPD7rgjl18Jok</string>
 
 </resources>

@@ -26,12 +26,6 @@
             android:layout_weight="1"
             android:singleLine="true"/>
 
-        <!--ImageButton
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:id="@+id/remove"
-            android:src="@drawable/ic_menu_delete" /-->
-
     </LinearLayout>
 
     <ProgressBar
@@ -61,19 +55,25 @@
             android:singleLine="true"/>
     </LinearLayout>
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textAppearance="?android:attr/textAppearanceMedium"
-        android:text="@string/gpTime"
-        android:id="@+id/gpTimeLabel" />
 
-    <TextView
-        android:layout_width="fill_parent"
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textAppearance="?android:attr/textAppearanceMedium"
-        android:text="@string/gpDescription"
-        android:id="@+id/gpDescriptionLabel" />
+        android:layout_gravity="center_horizontal">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:text="@string/gpTime"
+            android:id="@+id/gpTimeLabel" />
+
+        <TextView
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:id="@+id/gpTime" />
+    </LinearLayout>
 
     <EditText
         android:layout_width="fill_parent"
@@ -83,12 +83,19 @@
         android:gravity="left|top"
         android:height="50dp" />
 
-    <ImageView
+    <fragment
+        android:id="@+id/map"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:name="com.google.android.gms.maps.MapFragment"/>/>
+
+
+    <!--ImageView
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
         android:id="@+id/gpImage"
         android:layout_weight="1"
-        android:background="#007d7d7d" />
+        android:background="#007d7d7d" /-->
 
     <LinearLayout
         android:orientation="horizontal"
@@ -97,11 +104,11 @@
         android:layout_weight="1"
         android:gravity="center">
 
-        <ImageButton
+        <!--ImageButton
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:src="@drawable/ic_dialog_map"
-            android:id="@+id/showOnMap" />
+            android:id="@+id/showOnMap" /-->
 
     </LinearLayout>
 
