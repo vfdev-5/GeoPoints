@@ -30,7 +30,7 @@
 
 
         <activity
-            android:name=".GeoPointList"
+            android:name=".GeoPointsActivity"
             android:label="@string/title_activity_geo_point_list" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
