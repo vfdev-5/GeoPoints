@@ -10,6 +10,7 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.location.Location;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.Settings;
 import android.support.v13.app.FragmentPagerAdapter;
 import android.support.v4.view.ViewPager;
@@ -18,7 +19,6 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.CursorAdapter;
-import android.widget.ListAdapter;
 import android.widget.ListView;
 import android.widget.SimpleCursorAdapter;
 import android.widget.Toast;
@@ -36,7 +36,10 @@ import com.vfdev.android.DB.GeoDBConf;
 import com.vfdev.android.DB.GeoDBHandler;
 import com.vfdev.android.GeoTracker.GeoTracker;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.Locale;
+import java.util.Vector;
 
 
 /*
@@ -48,19 +51,15 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
 {
 
     private static final String TAG=GeoPointsActivity.class.getName();
+    private static final int POINTS_PAGE = 0;
+    private static final int MAP_PAGE = 1;
 
     // UI
-    private ViewPager mViewPager;
-    private TwoPagesAdapter mPagerAdapter;
-    private ActionBar mActionBar;
-    private ListFragment mGeoPointListFragment=new ListFragment() {
-        @Override
-        public void onListItemClick(ListView listView, View view, int position, long id) {
-            super.onListItemClick(listView,view,position,id);
-            editGeoPoint(id);
-        }
-    };
-    private MapFragment mGeoPointsMapFragment=MapFragment.newInstance();
+    private ViewPager mViewPager=null;
+    private TwoPagesAdapter mPagerAdapter=null;
+    private ActionBar mActionBar=null;
+    private ListFragment mGeoPointListFragment=null;
+    private MapFragment mGeoPointsMapFragment=null;
     private GoogleMap mMap=null;
 
     // DB & Geo
@@ -68,13 +67,55 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
     private GeoTracker mGeoTracker = null;
     private Location mCurrentLocation = null;
 
+    // Local data
+    protected class GeoPoint {
+        public String name;
+        public String description;
+        public LatLng latLng;
+        GeoPoint(String name, String description, LatLng latLng) {
+            this.name = name;
+            this.description = description;
+            this.latLng = latLng;
+        }
+    }
+    private Vector<GeoPoint> mGeoPoints;
+
 
     // ------ Activity methods -------
+
+    public GeoPointsActivity() {
+        super();
+        Log.i(TAG, "GeoPointsActivity");
+        mGeoPointsMapFragment = new MapFragment() {
+            @Override
+            public void onViewCreated(View view, Bundle savedInstanceState) {
+                super.onViewCreated(view, savedInstanceState);
+                Log.i(TAG, "MapFragement : onViewCreated");
+                setupMap();
+            }
+        };
+        mGeoPointListFragment = new ListFragment() {
+            @Override
+            public void onListItemClick(ListView listView, View view, int position, long id) {
+                super.onListItemClick(listView, view, position, id);
+                Log.i(TAG, "ListFragment : onListItemClick");
+                editGeoPoint(id);
+            }
+        };
+        mGeoPoints = new Vector<GeoPoint>();
+
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         Log.i(TAG, "onCreate()");
-        super.onCreate(savedInstanceState);
+
+//        Log.w(TAG, "super != null : " + String.valueOf(this != null));
+//        Log.w(TAG, "savedInstanceState != null : " + String.valueOf(savedInstanceState != null));
+        // Prevent from a crash if screen orientation changes
+        // Need a proper handling
+        super.onCreate(null);
+
         setContentView(R.layout.activity_geo_points);
 
         setupPagerUI();
@@ -90,6 +131,7 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
     }
     @Override
     public void onResume() {
+        Log.i(TAG, "onResume()");
         super.onResume();
 
         // Show the location provider :
@@ -98,11 +140,16 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
         mGeoTracker.requestLocationUpdates();
         // (re-)fill data from GeoDB:
         fillList();
+//        // restore map page
+//        if (mViewPager.getCurrentItem() == MAP_PAGE) {
+//            setupMap();
+//        }
 
     }
 
     @Override
     public void onPause() {
+        Log.i(TAG, "onPause()");
         mGeoTracker.stopLocationUpdates();
         super.onPause();
     }
@@ -111,6 +158,39 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
     public void onDestroy() {
         Log.i(TAG, "onDestroy()");
         super.onDestroy();
+    }
+
+    /** Save instance state */
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        Log.i(TAG, "onSaveInstanceState()");
+        super.onSaveInstanceState(outState);
+    }
+
+
+    @Override
+    protected void onRestoreInstanceState(Bundle savedState) {
+        Log.i(TAG, "onRestoreInstanceState()");
+        super.onRestoreInstanceState(savedState);
+
+        // get last known most accurate location :
+        Location location = mGeoTracker.getCurrentLocation();
+        if (location != null) {
+            handleLocation(location);
+        }
+    }
+
+    /** Handles Back button
+     * Go to Points Tab if on the Map page */
+    @Override
+    public void onBackPressed() {
+        Log.i(TAG, "onBackPressed()");
+
+        if (mViewPager.getCurrentItem() == MAP_PAGE) {
+            mViewPager.setCurrentItem(0);
+        } else {
+            super.onBackPressed();
+        }
     }
 
     // ----- OnLocationUpdateListener implementation ------
@@ -127,19 +207,9 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
         // When the given tab is selected, switch to the corresponding page in
         // the ViewPager.
         mViewPager.setCurrentItem(tab.getPosition());
-
         // setup map
-        if (tab.getPosition()==1) {
-            mMap = mGeoPointsMapFragment.getMap();
-            if (mMap != null) {
-                // clear previous points:
-                mMap.clear();
-                putMarkerOnMap("You are here",
-                        "Here is your current location",
-                        new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude()));
-                putPointsToMap();
-
-            }
+        if (tab.getPosition() == MAP_PAGE) {
+            setupMap();
         }
     }
 
@@ -149,6 +219,10 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
 
     @Override
     public void onTabReselected(ActionBar.Tab tab, FragmentTransaction fragmentTransaction) {
+        // setup map
+        if (tab.getPosition() == MAP_PAGE) {
+            setupMap();
+        }
     }
 
     // ------ Menu handling -------
@@ -198,6 +272,7 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
 
     protected void setupPagerUI()
     {
+        Log.i(TAG, "setupPagerUI()");
         // Set up the action bar.
         mActionBar = getActionBar();
         mActionBar.setNavigationMode(ActionBar.NAVIGATION_MODE_TABS);
@@ -216,6 +291,7 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
         mViewPager.setOnPageChangeListener(new ViewPager.SimpleOnPageChangeListener() {
             @Override
             public void onPageSelected(int position) {
+                Log.i(TAG,"onPageSelected : " + String.valueOf(position));
                 mActionBar.setSelectedNavigationItem(position);
             }
         });
@@ -227,6 +303,7 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
 
     protected void setupDbAndGeo()
     {
+        Log.i(TAG, "setupDbAndGeo");
         // setup GeoDB Handler :
         mGeoDBHandler = GeoDBHandler.getInstance();
         mGeoDBHandler.init(getApplicationContext());
@@ -246,6 +323,17 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
         if (!mGeoTracker.isEnabled()) {
             askToEnableLocationService();
         }
+
+        // create app external storage directory:
+        File appDir = new File(Environment.getExternalStorageDirectory().toString()+File.separator+
+                getResources().getString(R.string.title_activity_geo_point_list)
+        );
+        if (!appDir.exists()) {
+            if (!appDir.mkdirs()) {
+                Log.w(TAG,"setupDbAndGeo : failed to create dirs");
+            }
+        }
+
     }
 
     protected void askToEnableLocationService() {
@@ -260,9 +348,23 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
     }
 
 
+    protected void setupMap() {
+        mMap = mGeoPointsMapFragment.getMap();
+        if (mMap != null) {
+            // clear previous points:
+            mMap.clear();
+            putPointsToMap();
+            if (mCurrentLocation != null) {
+                putMarkerOnMap("You are here",
+                        "Here is your current location",
+                        new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude()));
+            }
+        }
+    }
 
     protected void createGeoPoint() {
         if (mCurrentLocation != null) {
+            Log.i(TAG, "createGeoPoint()");
             Intent i = new Intent(this, GeoPointEdit.class);
             i.putExtra("CurrentLatitude", mCurrentLocation.getLatitude());
             i.putExtra("CurrentLongitude", mCurrentLocation.getLongitude());
@@ -288,15 +390,24 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
 
     protected void fillList() {
 
-        Cursor cursor = mGeoDBHandler.getAllDataFromTable(GeoDBConf.GEODB_TABLE_GEOPOINTS);
 
-        if (cursor==null) return;
+        String[] fieldNames = {
+                GeoDBConf.COMMON_KEY_ID,
+                GeoDBConf.COMMON_KEY_NAME,
+                GeoDBConf.COMMON_KEY_DESC,
+                GeoDBConf.COMMON_KEY_LAT,
+                GeoDBConf.COMMON_KEY_LON
+        };
+
+        Cursor cursor = mGeoDBHandler.getAllDataFromTable(GeoDBConf.GEODB_TABLE_GEOPOINTS, fieldNames);
+
+        if (cursor == null) return;
 
         startManagingCursor(cursor);
         cursor.moveToFirst();
 
-        // Create an array to specify the fields we want to display in the list (only TITLE)
-        String[] from = new String[]{
+        // Create an array to specify the fields we want to display in the list
+        String[] from = {
                 GeoDBConf.COMMON_KEY_NAME,
                 GeoDBConf.COMMON_KEY_DESC
         };
@@ -320,12 +431,56 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
 
         // set points to the list fragment
         mGeoPointListFragment.setListAdapter(points);
+
+        // set points to memory
+        mGeoPoints.clear();
+
+        if (cursor.getCount() == 0) return;
+
+        cursor.moveToFirst();
+        do {
+            String gpName = cursor.getString(
+                    cursor.getColumnIndexOrThrow(GeoDBConf.COMMON_KEY_NAME));
+
+            String gpDescription = cursor.getString(
+                    cursor.getColumnIndexOrThrow(GeoDBConf.COMMON_KEY_DESC));
+
+            double lat = cursor.getFloat(cursor.getColumnIndexOrThrow(GeoDBConf.COMMON_KEY_LAT));
+            double lng = cursor.getFloat(cursor.getColumnIndexOrThrow(GeoDBConf.COMMON_KEY_LON));
+
+            mGeoPoints.add(new GeoPoint(gpName, gpDescription, new LatLng(lat, lng)));
+
+        } while (cursor.moveToNext());
+
     }
 
 
     protected void putPointsToMap() {
 
-        Cursor data = mGeoDBHandler.getAllDataFromTable(GeoDBConf.GEODB_TABLE_GEOPOINTS);
+
+        if (mMap == null)
+            return;
+
+        for (GeoPoint gp : mGeoPoints) {
+
+            // add new marker:
+            Marker marker = mMap.addMarker(new MarkerOptions().position(gp.latLng));
+            marker.setAlpha(0.7f);
+            marker.setTitle(gp.name);
+            marker.setSnippet(gp.description);
+            marker.setIcon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE));
+
+        }
+
+        /*
+        String[] fieldNames = {
+                GeoDBConf.COMMON_KEY_NAME,
+                GeoDBConf.COMMON_KEY_DESC,
+                GeoDBConf.COMMON_KEY_LAT,
+                GeoDBConf.COMMON_KEY_LON
+        };
+
+        Cursor data = mGeoDBHandler.getAllDataFromTable(GeoDBConf.GEODB_TABLE_GEOPOINTS, fieldNames);
         if (data==null) return;
         startManagingCursor(data);
 
@@ -336,8 +491,6 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
 
         if (mMap == null)
             return;
-
-        Log.i(TAG,"count : " + String.valueOf(data.getCount()));
 
         do {
             String gpName = data.getString(
@@ -351,11 +504,13 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
             double lng = data.getFloat(data.getColumnIndexOrThrow(GeoDBConf.COMMON_KEY_LON));
             // add new marker:
             Marker marker = mMap.addMarker(new MarkerOptions().position(new LatLng(lat, lng)));
+            marker.setAlpha(0.7f);
             marker.setSnippet(gpDescription);
             marker.setTitle(gpName);
             marker.setIcon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE));
 
         } while (data.moveToNext());
+        */
 
     }
 
@@ -365,6 +520,7 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
         if (mMap != null) {
             // add new marker:
             Marker marker = mMap.addMarker(new MarkerOptions().position(ll));
+            marker.setAlpha(0.7f);
             marker.setSnippet(description);
             marker.setTitle(name);
             mMap.moveCamera(CameraUpdateFactory.
@@ -396,6 +552,25 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
     }
 
 
+    public void onShowOnMap(View view) {
+        mViewPager.setCurrentItem(MAP_PAGE);
+        // Zoom on selected point
+        ListView listView = mGeoPointListFragment.getListView();
+        int position = listView.getPositionForView(view);
+//        Toast.makeText(getApplicationContext(), "Position : " + String.valueOf(position), Toast.LENGTH_SHORT).show();
+
+        if (mMap != null) {
+            mMap.moveCamera(CameraUpdateFactory.
+                            newCameraPosition(CameraPosition.fromLatLngZoom(
+                                            mGeoPoints.elementAt(position).latLng,
+                                            (float) 16.0)
+                            )
+            );
+        }
+
+    }
+
+
 
     /*
      *  Subclass FragmentPagerAdapter to display 2 static fragments
@@ -409,9 +584,9 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
         @Override
         public Fragment getItem(int position) {
             switch (position) {
-                case 0:
+                case POINTS_PAGE:
                     return mGeoPointListFragment;
-                case 1:
+                case MAP_PAGE:
                     return mGeoPointsMapFragment;
             }
             return null;
@@ -427,9 +602,9 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
         public CharSequence getPageTitle(int position) {
             Locale l = Locale.getDefault();
             switch (position) {
-                case 0:
+                case POINTS_PAGE:
                     return getResources().getString(R.string.list_tab_name).toUpperCase(l);
-                case 1:
+                case MAP_PAGE:
                     return getResources().getString(R.string.map_tab_name).toUpperCase(l);
             }
             return null;

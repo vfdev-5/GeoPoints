@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
+
     <string name="app_name">Geo Points</string>
     <string name="title_activity_geo_point_list">GeoPoints</string>
     <string name="list_tab_name">Points</string>

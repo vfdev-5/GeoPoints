@@ -8,6 +8,8 @@ import android.database.sqlite.SQLiteOpenHelper;
 import android.os.Bundle;
 import android.util.Log;
 
+import java.util.List;
+
 /** Singleton */
 public class GeoDBHandler {
 
@@ -65,6 +67,22 @@ public class GeoDBHandler {
         // Field names can be null -> all fields are given, however it is discouraged
         // http://developer.android.com/reference/android/database/sqlite/SQLiteDatabase.html
         String[] fieldNames = null;
+        return mHandlerPrivate.getReadableDatabase().query(tableName,
+                fieldNames,
+                null,
+                null,
+                null,
+                null,
+                null);
+    }
+
+    public Cursor getAllDataFromTable(String tableName, String[] fieldNames) {
+
+        if (mHandlerPrivate == null) {
+            return null;
+        }
+        // Field names can be null -> all fields are given, however it is discouraged
+        // http://developer.android.com/reference/android/database/sqlite/SQLiteDatabase.html
         return mHandlerPrivate.getReadableDatabase().query(tableName,
                 fieldNames,
                 null,

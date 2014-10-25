@@ -1,19 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="horizontal" android:layout_width="fill_parent"
-    android:layout_height="fill_parent">
-
-    <ImageView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:id="@+id/imageView"
-        android:src="@drawable/gp_icon" />
+    android:orientation="horizontal"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:descendantFocusability="blocksDescendants">
 
     <LinearLayout
+        android:id="@+id/gpItem"
         android:orientation="vertical"
         android:layout_width="fill_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="fill_parent"
+        android:layout_weight="1">
 
         <TextView
             android:layout_width="fill_parent"
@@ -21,7 +19,8 @@
             android:textAppearance="?android:attr/textAppearanceLarge"
             android:id="@+id/gpLIName"
             android:text="Geo Point title"
-            android:singleLine="true" />
+            android:singleLine="true"
+            android:layout_weight="1" />
 
         <TextView
             android:layout_width="fill_parent"
@@ -29,7 +28,15 @@
             android:textAppearance="?android:attr/textAppearanceSmall"
             android:text="Geo Point description"
             android:id="@+id/gpLIDescription"
-            android:singleLine="true" />
+            android:singleLine="true"
+            android:layout_weight="1" />
     </LinearLayout>
+
+    <ImageView
+        android:layout_width="wrap_content"
+        android:layout_height="fill_parent"
+        android:id="@+id/showOnMap"
+        android:onClick="onShowOnMap"
+        android:src="@android:drawable/ic_menu_mylocation" />
 
 </LinearLayout>

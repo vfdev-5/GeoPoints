@@ -1,9 +1,7 @@
-
-<LinearLayout
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
-    xmlns:android="http://schemas.android.com/apk/res/android"
     android:weightSum="1">
 
     <LinearLayout
@@ -28,11 +26,12 @@
 
     </LinearLayout>
 
-    <ProgressBar
-        style="?android:attr/progressBarStyleHorizontal"
+    <ImageView
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
-        android:id="@+id/progressBar" />
+        android:id="@+id/imageView"
+        android:layout_gravity="center_horizontal"
+        android:src="@android:color/background_dark" />
 
     <LinearLayout
         android:orientation="horizontal"
@@ -54,7 +53,6 @@
             android:layout_weight="1"
             android:singleLine="true"/>
     </LinearLayout>
-
 
     <LinearLayout
         android:orientation="horizontal"
@@ -83,26 +81,22 @@
         android:gravity="left|top"
         android:height="50dp" />
 
-    <fragment
-        android:id="@+id/map"
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:name="com.google.android.gms.maps.MapFragment"/>
 
-
-    <!--ImageView
+    <ImageView
         android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="fill_parent"
         android:id="@+id/gpImage"
-        android:layout_weight="1"
-        android:background="#007d7d7d" /-->
+        android:background="#007d7d7d"
+        android:onClick="onTakePictureEvent"
+        android:clickable="true"
+        android:scaleType="center" />
 
-    <LinearLayout
+    <!--LinearLayout
         android:orientation="horizontal"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:gravity="center">
+        android:gravity="center"-->
 
         <!--ImageButton
             android:layout_width="wrap_content"
@@ -110,6 +104,6 @@
             android:src="@drawable/ic_dialog_map"
             android:id="@+id/showOnMap" /-->
 
-    </LinearLayout>
+    <!--/LinearLayout-->
 
 </LinearLayout>

@@ -5,19 +5,26 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.PointF;
 import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
+import android.provider.MediaStore;
 import android.provider.Settings;
 import android.text.format.Time;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.view.WindowManager;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -32,25 +39,30 @@ import com.vfdev.android.DB.GeoDBConf;
 import com.vfdev.android.DB.GeoDBHandler;
 import com.vfdev.android.GeoTracker.GeoTracker;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
 import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 
 
 public class GeoPointEdit extends Activity {
 
     private static final String TAG=GeoPointEdit.class.getName();
-
-//    private static final int REMOVE_ID = Menu.FIRST;
+    private static final int REQUEST_IMAGE_CAPTURE = 1;
 
     private String mTable;
-    private long mRowId;
+    private long mRowId = -1;
     private TextView mCurrentLocationTV;
     private LatLng mCurrentLocation;
     private EditText mGPName;
     private EditText mGPDescription;
     private TextView mGPTime;
+    private ImageView mGPImageView;
+    private Bitmap mGPImageIcon = null;
+    private String mGPImagePath = "";
 
-    private GoogleMap mMap;
     private GeoDBHandler mGeoDBHandler;
 
     @Override
@@ -64,19 +76,10 @@ public class GeoPointEdit extends Activity {
         mGPTime = (TextView) findViewById(R.id.gpTime);
         mGPName = (EditText) findViewById(R.id.gpName);
         mGPDescription = (EditText) findViewById(R.id.gpDescription);
+        mGPImageView = (ImageView) findViewById(R.id.gpImage);
+        mGPImageView.setImageDrawable(getResources().getDrawable(android.R.drawable.ic_menu_camera));
 
         mGeoDBHandler = GeoDBHandler.getInstance();
-
-        MapFragment mapFragment = (MapFragment) getFragmentManager().findFragmentById(R.id.map);
-        mMap = mapFragment.getMap();
-        if (mMap == null) {
-            Toast.makeText(
-                    this,
-                    "Google map is not available. Too bad :(",
-                    Toast.LENGTH_LONG
-            ).show();
-        }
-
 
         Bundle extras = getIntent().getExtras();
         double lat = 0.0, lng = 0.0;
@@ -91,16 +94,7 @@ public class GeoPointEdit extends Activity {
                 // No id from GeoDB is passed -> add new geopoint
                 lat = extras.getDouble("CurrentLatitude", -12345);
                 lng = extras.getDouble("CurrentLongitude", -12345);
-                if (lat > -12345 && lng > -12345) {
-                    setCurrentLocation(lat, lng);
-                    if (mMap != null) {
-                        putMarkerOnMap("You are here", "", mCurrentLocation);
-                    }
-                }
-                // set current date/time :
-                Time now = new Time();
-                now.setToNow();
-                setCurrentDateTime(now);
+                addNewPoint(lat, lng);
             }
         }
 
@@ -151,9 +145,17 @@ public class GeoPointEdit extends Activity {
         super.onSaveInstanceState(outState);
 
         // Store temporary modifications in the outState
-//        outState.putSerializable(NotesDbAdapter.KEY_ROWID, mRowId);
-//        outState.putString(NotesDbAdapter.KEY_TITLE, mTitleText.getText().toString());
-//        outState.putString(NotesDbAdapter.KEY_BODY, mBodyText.getText().toString());
+        outState.putString("Table", mTable);
+        outState.putLong(GeoDBConf.COMMON_KEY_ID, mRowId);
+        outState.putSerializable(GeoDBConf.COMMON_KEY_NAME, mGPName.getText().toString());
+        outState.putSerializable(GeoDBConf.COMMON_KEY_DESC, mGPDescription.getText().toString());
+        outState.putDouble(GeoDBConf.COMMON_KEY_LAT, mCurrentLocation.latitude);
+        outState.putDouble(GeoDBConf.COMMON_KEY_LON, mCurrentLocation.longitude);
+        outState.putSerializable(GeoDBConf.GEOPOINTS_KEY_TIME, mGPTime.getText().toString());
+        if (mGPImageIcon != null) {
+            outState.putByteArray(GeoDBConf.GEOPOINTS_IMAGE_ICON, getBitmapAsByteArray(mGPImageIcon));
+        }
+        outState.putString(GeoDBConf.GEOPOINTS_IMAGE_PATH, mGPImagePath);
     }
 
     @Override
@@ -162,12 +164,25 @@ public class GeoPointEdit extends Activity {
         super.onRestoreInstanceState(savedState);
         // Restore row id from saved state
         if (savedState != null) {
-//            mRowId = (Long) savedState.getSerializable(NotesDbAdapter.KEY_ROWID);
-//            mTitleText.setText((String) savedState.getString(NotesDbAdapter.KEY_TITLE));
-//            mBodyText.setText((String) savedState.getString(NotesDbAdapter.KEY_BODY));
+            mTable = savedState.getString("Table");
+            mRowId = savedState.getLong(GeoDBConf.COMMON_KEY_ID);
+            mGPName.setText((String) savedState.getSerializable(GeoDBConf.COMMON_KEY_NAME));
+            mGPDescription.setText((String) savedState.getSerializable(GeoDBConf.COMMON_KEY_DESC));
+            double lat = savedState.getDouble(GeoDBConf.COMMON_KEY_LAT);
+            double lng = savedState.getDouble(GeoDBConf.COMMON_KEY_LON);
+            setCurrentLocation(lat, lng);
+            mGPTime.setText((String) savedState.getSerializable(GeoDBConf.GEOPOINTS_KEY_TIME));
+
+            byte [] imageIconData = savedState.getByteArray(GeoDBConf.GEOPOINTS_IMAGE_ICON);
+            if (imageIconData != null && imageIconData.length > 0) {
+                mGPImageIcon = BitmapFactory.decodeByteArray(imageIconData, 0, imageIconData.length);
+                mGPImageView.setImageBitmap(mGPImageIcon);
+            }
+            mGPImagePath = savedState.getString(GeoDBConf.GEOPOINTS_IMAGE_PATH);
+
             return;
         }
-//        mRowId = null;
+        mRowId = -1;
     }
 
     /** Handles Back button
@@ -193,7 +208,7 @@ public class GeoPointEdit extends Activity {
             startManagingCursor(data);
             data.moveToFirst();
 
-            Log.i(TAG,"count : " + String.valueOf(data.getCount()));
+//            Log.i(TAG,"count : " + String.valueOf(data.getCount()));
 
             mGPName.setText(data.getString(
                     data.getColumnIndexOrThrow(GeoDBConf.COMMON_KEY_NAME)
@@ -208,15 +223,34 @@ public class GeoPointEdit extends Activity {
             double lat = data.getFloat(data.getColumnIndexOrThrow(GeoDBConf.COMMON_KEY_LAT));
             double lng = data.getFloat(data.getColumnIndexOrThrow(GeoDBConf.COMMON_KEY_LON));
             setCurrentLocation(lat, lng);
-            putMarkerOnMap(
-                    mGPName.getText().toString(),
-                    mGPDescription.getText().toString(),
-                    mCurrentLocation
-            );
 
             mGPTime.setText(data.getString(data.getColumnIndexOrThrow(GeoDBConf.GEOPOINTS_KEY_TIME)));
 
+            // restore image bitmap :
+            byte [] imageIconData = data.getBlob(data.getColumnIndexOrThrow(GeoDBConf.GEOPOINTS_IMAGE_ICON));
+            if (imageIconData != null && imageIconData.length > 0) {
+                mGPImageIcon = BitmapFactory.decodeByteArray(imageIconData, 0, imageIconData.length);
+                mGPImageView.setImageBitmap(mGPImageIcon);
+            } else {
+                mGPImageView.setImageDrawable(getResources().getDrawable(android.R.drawable.ic_menu_camera));
+            }
+            mGPImagePath = data.getString(data.getColumnIndexOrThrow(GeoDBConf.GEOPOINTS_IMAGE_PATH));
+
         }
+    }
+
+    private void addNewPoint(double lat, double lng) {
+
+        if (lat > -12345 && lng > -12345) {
+            setCurrentLocation(lat, lng);
+//                    if (mMap != null) {
+//                        putMarkerOnMap("You are here", "", mCurrentLocation);
+//                    }
+        }
+        // set current date/time :
+        Time now = new Time();
+        now.setToNow();
+        setCurrentDateTime(now);
     }
 
     private void saveModifications() {
@@ -227,6 +261,8 @@ public class GeoPointEdit extends Activity {
         data.put(GeoDBConf.COMMON_KEY_LAT, mCurrentLocation.latitude);
         data.put(GeoDBConf.COMMON_KEY_LON, mCurrentLocation.longitude);
         data.put(GeoDBConf.GEOPOINTS_KEY_TIME, mGPTime.getText().toString());
+        data.put(GeoDBConf.GEOPOINTS_IMAGE_ICON, getBitmapAsByteArray(mGPImageIcon));
+        data.put(GeoDBConf.GEOPOINTS_IMAGE_PATH, mGPImagePath);
 
         if (mRowId == -1) {
             long id = mGeoDBHandler.createDataInTable(mTable, data);
@@ -245,6 +281,8 @@ public class GeoPointEdit extends Activity {
         // remove current item from DB
         if (mRowId != -1) {
             mGeoDBHandler.deleteDataInTable(mTable, mRowId);
+            // remove stored file:
+            removeFile(mGPImagePath);
         }
     }
 
@@ -259,25 +297,107 @@ public class GeoPointEdit extends Activity {
         mGPTime.setText(time.format("%Y/%m/%d - %H:%M:%S"));
     }
 
-    // Local methods:
-    private void putMarkerOnMap(String name, String description, LatLng ll) {
+    private File createImageFile() throws IOException {
+        // Create an image file name
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+        String imageFileName = "JPEG_" + timeStamp + ".jpg";
+        String appDir = Environment.getExternalStorageDirectory().toString()+File.separator+
+                getResources().getString(R.string.title_activity_geo_point_list);
+        File image = new File(appDir,imageFileName);
+        if(!image.createNewFile()){
+            return null;
+        }
+        // Save a file: path for use with ACTION_VIEW intents
+        mGPImagePath = image.getAbsolutePath();
+        return image;
+    }
 
-        // Add a marker of that location to the map
-        if (mMap != null) {
-            // clear all previous markers:
-            mMap.clear();
-            // add new marker:
-            Marker marker = mMap.addMarker(new MarkerOptions().position(ll));
-            marker.setSnippet(description);
-            marker.setTitle(name);
-            mMap.moveCamera(CameraUpdateFactory.
-                            newCameraPosition(CameraPosition.fromLatLngZoom(
-                                            ll,
-                                    (float) 16.0)
-                            )
-            );
+    public void onTakePictureEvent(View v) {
+
+        if (mGPImageIcon == null) {
+            Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE_SECURE);
+            if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
+
+                // Create the File where the photo should go
+                File photoFile = null;
+                try {
+                    photoFile = createImageFile();
+                } catch (IOException ex) {
+                    // Error occurred while creating the File
+                    Log.e(TAG, "onTakePictureEvent : Failed to create an image file");
+                    return;
+                }
+                // Continue only if the File was successfully created
+                if (photoFile != null) {
+                    takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT,
+                            Uri.fromFile(photoFile));
+                    startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE);
+                }
+            }
+
+        } else {
+            // Display full image
+            if (!mGPImagePath.isEmpty()) {
+                Intent intent = new Intent(Intent.ACTION_VIEW);
+                intent.setDataAndType(Uri.fromFile(new File(mGPImagePath)), "image/*");
+                startActivity(intent);
+            }
         }
     }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+
+        if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK) {
+
+            // Get the dimensions of the View
+//            int targetW = mGPImageView.getWidth() - 10;
+//            int targetH = mGPImageView.getHeight() - 10;
+            int targetW = Math.min(250, mGPImageView.getWidth() - 10);
+            int targetH = Math.min(250, mGPImageView.getHeight() - 10);
+
+            // Get the dimensions of the bitmap
+            BitmapFactory.Options bmOptions = new BitmapFactory.Options();
+            bmOptions.inJustDecodeBounds = true;
+            BitmapFactory.decodeFile(mGPImagePath, bmOptions);
+            int photoW = bmOptions.outWidth;
+            int photoH = bmOptions.outHeight;
+
+            // Determine how much to scale down the image
+            int scaleFactor = (int) Math.ceil(Math.max(photoW*1.0/targetW, photoH*1.0/targetH)) + 1;
+
+            // Decode the image file into a Bitmap sized to fill the View
+            bmOptions.inJustDecodeBounds = false;
+            bmOptions.inSampleSize = scaleFactor;
+            bmOptions.inPurgeable = true;
+
+            mGPImageIcon = BitmapFactory.decodeFile(mGPImagePath, bmOptions);
+            mGPImageView.setImageBitmap(mGPImageIcon);
+
+        } else {
+            // delete created temp file :
+            removeFile(mGPImagePath);
+        }
+    }
+
+
+    protected void removeFile(String filename) {
+        File fileToDel = new File(filename);
+        if (!fileToDel.exists() || !fileToDel.delete()) {
+            Log.w(TAG, "onActivityResult : failed to remove empty temp image file");
+        }
+    }
+
+    protected static byte[] getBitmapAsByteArray(Bitmap bitmap) {
+        if (bitmap == null)
+            return "".getBytes();
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        bitmap.compress(Bitmap.CompressFormat.PNG, 0, outputStream);
+        return outputStream.toByteArray();
+    }
+
+
 
 
 

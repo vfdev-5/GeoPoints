@@ -151,18 +151,8 @@ public class GeoTracker extends Service implements LocationListener {
         mLocationManager.removeUpdates(this);
     }
 
-    public double getLatitude() {
-        if (mCurrentLocation != null) {
-            return mCurrentLocation.getLatitude();
-        }
-        return 0.0;
-    }
-
-    public double getLongitude() {
-        if (mCurrentLocation != null) {
-            return mCurrentLocation.getLongitude();
-        }
-        return 0.0;
+    public Location getCurrentLocation() {
+        return mCurrentLocation;
     }
 
     public Location getLastKnownLocation() {

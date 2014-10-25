@@ -6,7 +6,7 @@ package com.vfdev.android.DB;
 public class GeoDBConf {
     /** Geo Database info : name, version, tables, field names etc */
     public static final String GEODB_NAME="GeoDB";
-    public static final int GEODB_VERSION=2;
+    public static final int GEODB_VERSION=3;
     public static final String GEODB_TABLE_GEOPOINTS="GeoPoints";
     public static final String GEODB_TABLE_GEOREMINDERS="GeoReminders";
 
@@ -18,6 +18,8 @@ public class GeoDBConf {
 
     /** GEODB_TABLE_GEOPOINTS field names : */
     public static final String GEOPOINTS_KEY_TIME="gpTime";
+    public static final String GEOPOINTS_IMAGE_ICON="gpImageIcon";
+    public static final String GEOPOINTS_IMAGE_PATH="gpImagePath";
 
     /** GEODB_TABLE_GEOREMINDERS field names : */
     public static final String GEOREMINDERS_KEY_RADIUS="grRadius";
@@ -32,7 +34,9 @@ public class GeoDBConf {
                     COMMON_KEY_DESC + " text not null, " +
                     COMMON_KEY_LAT + " float not null, " +
                     COMMON_KEY_LON + " float not null, " +
-                    GEOPOINTS_KEY_TIME + " text not null" +
+                    GEOPOINTS_KEY_TIME + " text not null, " +
+                    GEOPOINTS_IMAGE_ICON + " blob, " +
+                    GEOPOINTS_IMAGE_PATH + " string" +
                     ");";
 
     public static final String GEODB_CREATE_GEOREMINDERS=
