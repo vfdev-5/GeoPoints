@@ -6,6 +6,13 @@
     android:layout_height="fill_parent"
     android:descendantFocusability="blocksDescendants">
 
+    <CheckBox
+        android:layout_width="wrap_content"
+        android:layout_height="fill_parent"
+        android:id="@+id/checkBox"
+        android:layout_gravity="center_vertical"
+        android:onClick="onItemChecked"/>
+
     <LinearLayout
         android:id="@+id/gpItem"
         android:orientation="vertical"

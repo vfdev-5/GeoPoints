@@ -138,4 +138,21 @@ public class GeoDBHandler {
     }
 
 
+    public boolean deleteDataInTable(String tableName, long[] ids)
+    {
+        SQLiteDatabase db = mHandlerPrivate.getWritableDatabase();
+        String values = "";
+        for (int i=0; i<ids.length-1; i++) {
+            long id = ids[i];
+            values += String.valueOf(id) + ", ";
+        }
+        values += String.valueOf(ids[ids.length-1]);
+        return db.delete(
+                tableName,
+                GeoDBConf.COMMON_KEY_ID + " in (" + values + ")",
+                null) > 0;
+    }
+
+
+
 }

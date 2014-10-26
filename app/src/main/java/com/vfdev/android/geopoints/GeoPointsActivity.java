@@ -20,7 +20,9 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.CheckBox;
 import android.widget.CursorAdapter;
+import android.widget.ListAdapter;
 import android.widget.ListView;
 import android.widget.SimpleCursorAdapter;
 import android.widget.Toast;
@@ -39,7 +41,7 @@ import com.vfdev.android.DB.GeoDBHandler;
 import com.vfdev.android.GeoTracker.GeoTracker;
 
 import java.io.File;
-import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Vector;
 
@@ -109,6 +111,8 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
         }
     }
     private Vector<GeoPoint> mGeoPoints;
+    private ArrayList<Integer> mCheckedListItems = null;
+    private boolean mIsModifiedMenu;
 
 
     // ------ Activity methods -------
@@ -132,7 +136,12 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
                 editGeoPoint(id);
             }
         };
+//        mGeoPointListFragment.setRetainInstance(true);
+
         mGeoPoints = new Vector<GeoPoint>();
+        mCheckedListItems = new ArrayList<Integer>();
+        mIsModifiedMenu = false;
+
 
     }
 
@@ -175,6 +184,21 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
             setupMap();
         }
 
+//        // restore selection :
+//        for (Integer p: mCheckedListItems) {
+//            // set checkBox to true:
+//            ListView lv = mGeoPointListFragment.getListView();
+//            View v = lv.getChildAt(p);
+//            ArrayList<View> t = v.getTouchables();
+//        }
+//        if (mCheckedListItems.size()>0) {
+//            // refresh menu:
+//            mIsModifiedMenu=true;
+//            invalidateOptionsMenu();
+//        } else {
+//            mIsModifiedMenu=false;
+//        }
+
     }
 
     @Override
@@ -197,6 +221,7 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
         super.onSaveInstanceState(outState);
 
         outState.putInt("MapType", mMapType);
+        outState.putIntegerArrayList("SelectedItems",mCheckedListItems);
 
     }
 
@@ -207,6 +232,7 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
         super.onRestoreInstanceState(savedState);
 
         mMapType = savedState.getInt("MapType");
+        mCheckedListItems = savedState.getIntegerArrayList("SelectedItems");
 
         // get last known most accurate location :
         Location location = mGeoTracker.getCurrentLocation();
@@ -288,6 +314,20 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
     }
 
     @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+
+        if (mIsModifiedMenu) {
+            menu.findItem(R.id.action_add_point).setVisible(false);
+            menu.findItem(R.id.action_remove_points).setVisible(true);
+        } else {
+            menu.findItem(R.id.action_add_point).setVisible(true);
+            menu.findItem(R.id.action_remove_points).setVisible(false);
+        }
+
+        return super.onPrepareOptionsMenu(menu);
+    }
+
+    @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         // Handle action bar item clicks here. The action bar will
         // automatically handle clicks on the Home/Up button, so long
@@ -304,6 +344,14 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
 //        }
         else if (id == R.id.action_map_select_type) {
             startMapSettingsDialog();
+            return true;
+        }
+        else if (id == R.id.action_remove_points) {
+            removeSelectedPoints();
+            fillList();
+            // Update menu
+            mIsModifiedMenu=false;
+            invalidateOptionsMenu();
             return true;
         }
 
@@ -437,6 +485,7 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
         }
     }
 
+    /// Method to launch GeoPointEdit activity to create GeoPoint
     protected void createGeoPoint() {
         if (mCurrentLocation != null) {
             Log.i(TAG, "createGeoPoint()");
@@ -455,6 +504,7 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
         }
     }
 
+    /// Method to launch GeoPointEdit activity to edit GeoPoint
     protected void editGeoPoint(long id) {
         Intent i = new Intent(this, GeoPointEdit.class);
         // Put extra info about selected item : id and table name
@@ -463,8 +513,9 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
         startActivity(i);
     }
 
-    protected void fillList() {
 
+    /// Method to fill ListView from the DB
+    protected void fillList() {
 
         String[] fieldNames = {
                 GeoDBConf.COMMON_KEY_ID,
@@ -531,6 +582,23 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
         } while (cursor.moveToNext());
     }
 
+    /// Method to remove checked (in ListView) geopoint from the DB
+    protected void removeSelectedPoints() {
+
+        if (mCheckedListItems.isEmpty()) return;
+
+        long[] values = new long[mCheckedListItems.size()];
+        for (int i=0; i<mCheckedListItems.size();i++) {
+            Integer p = mCheckedListItems.get(i);
+            if (p>=0 && p < mGeoPoints.size()) {
+                values[i] = mGeoPoints.elementAt(p).id;
+            }
+        }
+
+        mGeoDBHandler.deleteDataInTable(GeoDBConf.GEODB_TABLE_GEOPOINTS, values);
+    }
+
+
     protected void putPointsToMap() {
         if (mMap == null)
             return;
@@ -561,26 +629,6 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
         return output;
     }
 
-    protected Marker putMarkerOnMap(String name, String description, LatLng ll) {
-
-        // Add a marker of that location to the map
-        if (mMap != null) {
-            // add new marker:
-            Marker marker = mMap.addMarker(new MarkerOptions().position(ll));
-            marker.setAlpha(0.7f);
-            marker.setSnippet(description);
-            marker.setTitle(name);
-            mMap.moveCamera(CameraUpdateFactory.
-                            newCameraPosition(CameraPosition.fromLatLngZoom(
-                                            ll,
-                                            (float) 16.0)
-                            )
-            );
-            return marker;
-        }
-        return null;
-    }
-
     protected void showLocationProvider() {
 
         String availableProviders = mGeoTracker.getAvailableProviders();
@@ -600,6 +648,33 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
         }
     }
 
+
+    public void onItemChecked(View view) {
+        if (!(view instanceof CheckBox )) return;
+        CheckBox cb = (CheckBox) view;
+        ListView listView = mGeoPointListFragment.getListView();
+        int position = listView.getPositionForView(view);
+        if (cb.isChecked()) {
+            if (!mCheckedListItems.contains(position)) {
+                mCheckedListItems.add(position);
+            }
+        } else {
+            if (mCheckedListItems.contains(position)) {
+                mCheckedListItems.remove((Integer)position);
+            }
+        }
+
+        boolean callInvalidateOptionsMenu=false;
+        if (mCheckedListItems.size() > 0) {
+            if (!mIsModifiedMenu) callInvalidateOptionsMenu = true;
+            mIsModifiedMenu=true;
+        } else {
+            if (mIsModifiedMenu) callInvalidateOptionsMenu = true;
+            mIsModifiedMenu=false;
+        }
+
+        if (callInvalidateOptionsMenu) invalidateOptionsMenu();
+    }
 
     public void onShowOnMap(View view) {
         mViewPager.setCurrentItem(MAP_PAGE);

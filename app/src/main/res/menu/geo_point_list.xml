@@ -9,13 +9,21 @@
 
     <item android:id="@+id/action_map_select_type"
         android:title="@string/map_select_type_dialog"
-        android:orderInCategory="1"
+        android:orderInCategory="100"
         android:showAsAction="never" />
 
     <item android:id="@+id/action_add_point"
         android:title="@string/action_add_point"
         android:icon="@android:drawable/ic_menu_add"
         android:orderInCategory="0"
+        android:visible="true"
+        android:showAsAction="always" />
+
+    <item android:id="@+id/action_remove_points"
+        android:title="@string/action_remove_points"
+        android:icon="@android:drawable/ic_menu_delete"
+        android:orderInCategory="1"
+        android:visible="false"
         android:showAsAction="always" />
 
 </menu>

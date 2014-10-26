@@ -3,7 +3,7 @@
     tools:context="com.vfdev.android.geopoints.GeoPointEdit" >
 
     <item android:id="@+id/action_remove"
-        android:icon="@drawable/ic_menu_delete"
+        android:icon="@android:drawable/ic_menu_delete"
         android:title="@string/action_remove_point"
         android:orderInCategory="10"
         android:showAsAction="always" />
