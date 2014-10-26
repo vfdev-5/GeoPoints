@@ -1,8 +1,10 @@
 package com.vfdev.android.geopoints;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Bitmap;
@@ -15,6 +17,7 @@ import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.preference.DialogPreference;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.text.format.Time;
@@ -132,8 +135,29 @@ public class GeoPointEdit extends Activity {
             exitActivity();
             return true;
         } else if (id == R.id.action_remove) {
-            removeGeoPoint();
-            exitActivity();
+
+            // TODO: Alert ask user
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setTitle(R.string.confirmRemoval);
+            builder.setMessage(R.string.confirmRemovalMsg);
+            builder.setPositiveButton(R.string.yes, new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface dialog,int which) {
+                    removeGeoPoint();
+                    exitActivity();
+                }
+            });
+            builder.setNegativeButton(R.string.no, new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface dialog,int which) {
+                    dialog.cancel();
+                    exitActivity();
+                }
+            });
+
+            AlertDialog dialog = builder.create();
+            dialog.show();
+
+//            removeGeoPoint();
+//            exitActivity();
         }
         return super.onOptionsItemSelected(item);
     }
@@ -205,11 +229,16 @@ public class GeoPointEdit extends Activity {
             Cursor data = mGeoDBHandler.getDataOnRowIdFromTable(mRowId, mTable);
             if (data == null) return;
 
+
+            if (data.getCount() < 1) {
+                Log.w(TAG, "count is zero or negative -> delete table entry");
+                removeGeoPoint();
+                return;
+            }
+
             startManagingCursor(data);
+            // !!! CAN CRASH HERE
             data.moveToFirst();
-
-//            Log.i(TAG,"count : " + String.valueOf(data.getCount()));
-
             mGPName.setText(data.getString(
                     data.getColumnIndexOrThrow(GeoDBConf.COMMON_KEY_NAME)
                     )
@@ -353,8 +382,8 @@ public class GeoPointEdit extends Activity {
             // Get the dimensions of the View
 //            int targetW = mGPImageView.getWidth() - 10;
 //            int targetH = mGPImageView.getHeight() - 10;
-            int targetW = Math.min(250, mGPImageView.getWidth() - 10);
-            int targetH = Math.min(250, mGPImageView.getHeight() - 10);
+            int targetW = 250;
+            int targetH = 250;
 
             // Get the dimensions of the bitmap
             BitmapFactory.Options bmOptions = new BitmapFactory.Options();

@@ -4,25 +4,35 @@
 
     <string name="app_name">Geo Points</string>
     <string name="title_activity_geo_point_list">GeoPoints</string>
+    <string name="title_activity_geo_point_edit">Edit Geo Point</string>
+
     <string name="list_tab_name">Points</string>
     <string name="map_tab_name">Map</string>
+
     <string name="action_settings">Settings</string>
     <string name="action_add_point">Add</string>
     <string name="action_remove_point">Remove</string>
-    <string name="action_show_on_map">Show on map</string>
+
+
+    <string name="no_current_location">---, ---</string>
     <string name="your_location">Your location: </string>
-    <string name="no_current_location">----, ----</string>
-    <string name="title_activity_geo_point_edit">Edit Geo Point</string>
     <string name="gpName">Name :</string>
     <string name="gpDescription">Description :</string>
     <string name="gpLocation">Location :</string>
     <string name="gpTime">Date/Time :</string>
-    <string name="gpShowOnMap">Show\n on map</string>
-    <string name="map_select_type_dialog">Map Type</string>
+
+    <string name="map_select_type_dialog">Choose map type</string>
     <string name="map_type_normal">Normal</string>
     <string name="map_type_hybrid">Hybrid</string>
     <string name="map_type_satellite">Satellite</string>
     <string name="map_type_terrain">Terrain</string>
+
+    <string name="confirmRemovalMsg">Please, confirm the suppression</string>
+    <string name="confirmRemoval">Confirm : </string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+
+
 
     <string-array name="maptypes">
         <item>@string/map_type_normal</item>

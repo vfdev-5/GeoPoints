@@ -2,10 +2,12 @@ package com.vfdev.android.geopoints;
 
 import android.app.ActionBar;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.Fragment;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
 import android.app.ListFragment;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.Cursor;
 import android.location.Location;
@@ -47,7 +49,9 @@ import java.util.Vector;
 */
 
 public class GeoPointsActivity extends Activity implements ActionBar.TabListener,
-        GeoTracker.OnLocationUpdateListener
+        GeoTracker.OnLocationUpdateListener,
+        GoogleMap.OnInfoWindowClickListener,
+        GoogleMap.OnMarkerClickListener
 {
 
     private static final String TAG=GeoPointsActivity.class.getName();
@@ -61,28 +65,53 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
     private ListFragment mGeoPointListFragment=null;
     private MapFragment mGeoPointsMapFragment=null;
     private GoogleMap mMap=null;
+    private int mMapType = GoogleMap.MAP_TYPE_NORMAL;
 
     // DB & Geo
     private GeoDBHandler mGeoDBHandler = null;
     private GeoTracker mGeoTracker = null;
     private Location mCurrentLocation = null;
 
+    // Map markers
+    private Marker mCurrentLocationMarker=null;
+
     // Local data
     protected class GeoPoint {
         public String name;
         public String description;
         public LatLng latLng;
-        GeoPoint(String name, String description, LatLng latLng) {
+        public long id;
+        GeoPoint(long id, String name, String description, LatLng latLng) {
+            this.id = id;
             this.name = name;
             this.description = description;
             this.latLng = latLng;
+        }
+        GeoPoint(Marker marker) {
+            this.id=-1;
+            this.name = marker.getTitle();
+            this.description = marker.getSnippet();
+            this.latLng = marker.getPosition();
+        }
+
+        @Override
+        public boolean equals(Object pointObj){
+            if (!(pointObj instanceof GeoPoint)) return false;
+            GeoPoint point = (GeoPoint) pointObj;
+
+            if (point.id < 0 || this.id < 0) {
+                return this.latLng.equals(point.latLng) &&
+                        this.name.equals(point.name) &&
+                        this.description.equals(point.description);
+            } else {
+                return this.id == point.id;
+            }
         }
     }
     private Vector<GeoPoint> mGeoPoints;
 
 
     // ------ Activity methods -------
-
     public GeoPointsActivity() {
         super();
         Log.i(TAG, "GeoPointsActivity");
@@ -94,6 +123,7 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
                 setupMap();
             }
         };
+
         mGeoPointListFragment = new ListFragment() {
             @Override
             public void onListItemClick(ListView listView, View view, int position, long id) {
@@ -140,10 +170,10 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
         mGeoTracker.requestLocationUpdates();
         // (re-)fill data from GeoDB:
         fillList();
-//        // restore map page
-//        if (mViewPager.getCurrentItem() == MAP_PAGE) {
-//            setupMap();
-//        }
+        // refresh Map_page (e.g. if item is deleted passing directly from Map_page)
+        if (mViewPager.getCurrentItem() == MAP_PAGE) {
+            setupMap();
+        }
 
     }
 
@@ -165,6 +195,9 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
     protected void onSaveInstanceState(Bundle outState) {
         Log.i(TAG, "onSaveInstanceState()");
         super.onSaveInstanceState(outState);
+
+        outState.putInt("MapType", mMapType);
+
     }
 
 
@@ -172,6 +205,8 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
     protected void onRestoreInstanceState(Bundle savedState) {
         Log.i(TAG, "onRestoreInstanceState()");
         super.onRestoreInstanceState(savedState);
+
+        mMapType = savedState.getInt("MapType");
 
         // get last known most accurate location :
         Location location = mGeoTracker.getCurrentLocation();
@@ -201,6 +236,25 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
         }
     }
 
+    // ----- GoogleMap.OnMarkerClickListener implementation ------
+    @Override
+    public boolean onMarkerClick(Marker marker) {
+        if (marker.getTitle().isEmpty() && marker.getSnippet().isEmpty()) {
+            onInfoWindowClick(marker);
+        }
+        return false;
+    }
+
+    // ----- GoogleMap.OnInfoWindowClickListener implementation ------
+    @Override
+    public void onInfoWindowClick(Marker marker) {
+        // Open GeoPointEdit activity
+        int position = mGeoPoints.indexOf(new GeoPoint(marker));
+        if (position > -1) {
+            editGeoPoint(mGeoPoints.elementAt(position).id);
+        }
+    }
+
     // ------ Tabs handling -------
     @Override
     public void onTabSelected(ActionBar.Tab tab, FragmentTransaction fragmentTransaction) {
@@ -208,9 +262,9 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
         // the ViewPager.
         mViewPager.setCurrentItem(tab.getPosition());
         // setup map
-        if (tab.getPosition() == MAP_PAGE) {
-            setupMap();
-        }
+//        if (tab.getPosition() == MAP_PAGE) {
+//            setupMap();
+//        }
     }
 
     @Override
@@ -248,6 +302,11 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
 //            fillList();
 //            return true;
 //        }
+        else if (id == R.id.action_map_select_type) {
+            startMapSettingsDialog();
+            return true;
+        }
+
         return super.onOptionsItemSelected(item);
     }
 
@@ -295,9 +354,7 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
                 mActionBar.setSelectedNavigationItem(position);
             }
         });
-
         initTabs();
-
     }
 
 
@@ -337,27 +394,45 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
     }
 
     protected void askToEnableLocationService() {
-
         Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
         startActivity(intent);
-
     }
 
     protected void handleLocation(Location location) {
         mCurrentLocation = location;
+        if (mCurrentLocationMarker != null && mMap != null) {
+            mCurrentLocationMarker.setPosition(new LatLng(location.getLatitude(), location.getLongitude()));
+            zoomOnPoint(mMap, mCurrentLocationMarker.getPosition());
+        }
     }
 
 
     protected void setupMap() {
-        mMap = mGeoPointsMapFragment.getMap();
+        // setup map and its configuration
+        if (mMap == null) {
+            mMap = mGeoPointsMapFragment.getMap();
+            if (mMap != null) {
+                mMap.setOnInfoWindowClickListener(this);
+                mMap.setOnMarkerClickListener(this);
+            }
+        }
+        // set points
         if (mMap != null) {
+            // TODO: Think about !!!
+            Log.w(TAG,"Redraw points");
             // clear previous points:
             mMap.clear();
+            mMap.setMapType(mMapType);
             putPointsToMap();
             if (mCurrentLocation != null) {
-                putMarkerOnMap("You are here",
+                mCurrentLocationMarker = createCurrentPositionMarker(mMap,
+                        "You are here",
                         "Here is your current location",
                         new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude()));
+                zoomOnPoint(mMap, mCurrentLocationMarker.getPosition());
+//                mCurrentLocationMarker = putMarkerOnMap("You are here",
+//                        "Here is your current location",
+//                        new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude()));
             }
         }
     }
@@ -382,7 +457,7 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
 
     protected void editGeoPoint(long id) {
         Intent i = new Intent(this, GeoPointEdit.class);
-        // Put extra info about selected item : key_rowid and id
+        // Put extra info about selected item : id and table name
         i.putExtra(GeoDBConf.COMMON_KEY_ID, id);
         i.putExtra("Table", GeoDBConf.GEODB_TABLE_GEOPOINTS);
         startActivity(i);
@@ -439,6 +514,9 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
 
         cursor.moveToFirst();
         do {
+            long id = cursor.getLong(
+                    cursor.getColumnIndexOrThrow(GeoDBConf.COMMON_KEY_ID));
+
             String gpName = cursor.getString(
                     cursor.getColumnIndexOrThrow(GeoDBConf.COMMON_KEY_NAME));
 
@@ -448,73 +526,42 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
             double lat = cursor.getFloat(cursor.getColumnIndexOrThrow(GeoDBConf.COMMON_KEY_LAT));
             double lng = cursor.getFloat(cursor.getColumnIndexOrThrow(GeoDBConf.COMMON_KEY_LON));
 
-            mGeoPoints.add(new GeoPoint(gpName, gpDescription, new LatLng(lat, lng)));
+            mGeoPoints.add(new GeoPoint(id, gpName, gpDescription, new LatLng(lat, lng)));
 
         } while (cursor.moveToNext());
-
     }
-
 
     protected void putPointsToMap() {
-
-
         if (mMap == null)
             return;
-
         for (GeoPoint gp : mGeoPoints) {
-
             // add new marker:
-            Marker marker = mMap.addMarker(new MarkerOptions().position(gp.latLng));
-            marker.setAlpha(0.7f);
-            marker.setTitle(gp.name);
-            marker.setSnippet(gp.description);
+            Marker marker = createMarker(mMap, gp.name, gp.description, gp.latLng);
             marker.setIcon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE));
-
+            marker.setFlat(true);
         }
-
-        /*
-        String[] fieldNames = {
-                GeoDBConf.COMMON_KEY_NAME,
-                GeoDBConf.COMMON_KEY_DESC,
-                GeoDBConf.COMMON_KEY_LAT,
-                GeoDBConf.COMMON_KEY_LON
-        };
-
-        Cursor data = mGeoDBHandler.getAllDataFromTable(GeoDBConf.GEODB_TABLE_GEOPOINTS, fieldNames);
-        if (data==null) return;
-        startManagingCursor(data);
-
-        if (!data.moveToFirst()) {
-            Log.i(TAG, "setPointsToMap : no data");
-            return;
-        }
-
-        if (mMap == null)
-            return;
-
-        do {
-            String gpName = data.getString(
-                    data.getColumnIndexOrThrow(GeoDBConf.COMMON_KEY_NAME));
-
-
-            String gpDescription = data.getString(
-                    data.getColumnIndexOrThrow(GeoDBConf.COMMON_KEY_DESC));
-
-            double lat = data.getFloat(data.getColumnIndexOrThrow(GeoDBConf.COMMON_KEY_LAT));
-            double lng = data.getFloat(data.getColumnIndexOrThrow(GeoDBConf.COMMON_KEY_LON));
-            // add new marker:
-            Marker marker = mMap.addMarker(new MarkerOptions().position(new LatLng(lat, lng)));
-            marker.setAlpha(0.7f);
-            marker.setSnippet(gpDescription);
-            marker.setTitle(gpName);
-            marker.setIcon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE));
-
-        } while (data.moveToNext());
-        */
-
     }
 
-    private void putMarkerOnMap(String name, String description, LatLng ll) {
+    protected Marker createMarker(GoogleMap map, String name, String description, LatLng ll) {
+        return map.addMarker(new MarkerOptions()
+                .position(ll)
+                .alpha(0.7f)
+                .title(name)
+                .snippet(description)
+        );
+    }
+
+
+    protected Marker createCurrentPositionMarker(GoogleMap map, String name, String description, LatLng ll) {
+
+        Marker output = createMarker(map, name, description, ll);
+        output.setAlpha(1.0f);
+        output.setIcon(BitmapDescriptorFactory.fromResource(android.R.drawable.ic_menu_myplaces));
+
+        return output;
+    }
+
+    protected Marker putMarkerOnMap(String name, String description, LatLng ll) {
 
         // Add a marker of that location to the map
         if (mMap != null) {
@@ -529,7 +576,9 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
                                             (float) 16.0)
                             )
             );
+            return marker;
         }
+        return null;
     }
 
     protected void showLocationProvider() {
@@ -558,16 +607,57 @@ public class GeoPointsActivity extends Activity implements ActionBar.TabListener
         ListView listView = mGeoPointListFragment.getListView();
         int position = listView.getPositionForView(view);
 //        Toast.makeText(getApplicationContext(), "Position : " + String.valueOf(position), Toast.LENGTH_SHORT).show();
-
         if (mMap != null) {
-            mMap.moveCamera(CameraUpdateFactory.
+            zoomOnPoint(mMap, mGeoPoints.elementAt(position).latLng);
+        }
+
+    }
+
+    protected void zoomOnPoint(GoogleMap map, LatLng latLng) {
+            map.moveCamera(CameraUpdateFactory.
                             newCameraPosition(CameraPosition.fromLatLngZoom(
-                                            mGeoPoints.elementAt(position).latLng,
+                                            latLng,
                                             (float) 16.0)
                             )
             );
-        }
+    }
 
+    private void startMapSettingsDialog() {
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(R.string.map_select_type_dialog);
+        builder.setItems(R.array.maptypes, new DialogInterface.OnClickListener(){
+
+            private static final int TYPE_NORMAL = 0;
+            private static final int TYPE_HYBRID = 1;
+            private static final int TYPE_SATELLITE = 2;
+            private static final int TYPE_TERRAIN = 3;
+
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+
+                switch(which){
+                    case TYPE_NORMAL:
+                        mMapType=GoogleMap.MAP_TYPE_NORMAL;
+                        break;
+                    case TYPE_HYBRID:
+                        mMapType=GoogleMap.MAP_TYPE_HYBRID;
+                        break;
+                    case TYPE_SATELLITE:
+                        mMapType=GoogleMap.MAP_TYPE_SATELLITE;
+                        break;
+                    case TYPE_TERRAIN:
+                        mMapType=GoogleMap.MAP_TYPE_TERRAIN;
+                        break;
+                }
+                if (mMap != null) {
+                    mMap.setMapType(mMapType);
+                }
+            }
+        });
+
+        AlertDialog dialog = builder.create();
+        dialog.show();
     }
 
 
